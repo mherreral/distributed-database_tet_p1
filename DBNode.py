@@ -6,6 +6,8 @@ import logging
 import json
 import os
 
+from flask import request
+
 isReplica = False
 followersIp = []
 #rootDir = '/db'
@@ -21,7 +23,56 @@ class Database(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
 
+    def sendRequestToReplica(self, key, text):
+        pass
+
     # Return data from DB
+    def get(self, filename):
+        #requestedFile = os.path.join(rootDir, file)
+        # Open and send requested file if found, if not, send 404
+        try:
+            file = open(filename, "r")
+            content = file.read()
+            file.close()
+            self._set_response(200)
+            self.wfile.write(content.encode('utf-8'))
+        except:
+            self._set_response(404)
+
+    # Update resource in database
+    def update(self, filename, file_content):
+        #requestedFile = os.path.join(rootDir, post_data['key'])
+        if exists(filename):
+            # Update file
+            file = open(filename, "w")
+            file.write(file_content)
+            file.close()
+            self._set_response(200)
+        else:
+            self._set_response(404)
+
+        if not getIsReplica():
+            pass
+
+    # Delete resource in database
+    def delete(self, filename):
+        #requestedFile = os.path.join(rootDir, get_data['key'])
+        # Open and delete requested file if found, if not, send 404
+        if exists(filename):
+            os.remove(filename)
+            self._set_response(200)
+        else:
+            self._set_response(404)
+
+    # Create resource in database
+    def post(self, file, file_content):
+        # Save file
+        #requestedFile = os.path.join(rootDir, post_data['key'])
+        file = open(file, "w")
+        file.write(file_content)
+        file.close()
+        self._set_response(200)
+
     def do_GET(self):
         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n",
                      str(self.path), str(self.headers))
@@ -32,21 +83,9 @@ class Database(BaseHTTPRequestHandler):
 
         # Obtain path
         get_data = query.split("=")
-
-        #requestedFile = os.path.join(rootDir, get_data[1])
         requested_file = get_data[1]
+        self.get(requested_file)
 
-        # Open and send requested file if found, if not, send 404
-        try:
-            file = open(requested_file, "r")
-            content = file.read()
-            file.close()
-            self._set_response(200)
-            self.wfile.write(content.encode('utf-8'))
-        except:
-            self._set_response(404)
-
-    # Create resource in database
     def do_POST(self):
         # Gets the size of data
         content_length = int(self.headers['Content-Length'])
@@ -54,18 +93,10 @@ class Database(BaseHTTPRequestHandler):
         logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
                      str(self.path), str(self.headers), post_data)
 
-        # Save file
-        #requestedFile = os.path.join(rootDir, post_data['key'])
         requested_file = post_data['key']
-        file = open(requested_file, "w")
-        file.write(post_data['value'])
-        file.close()
-        self._set_response(200)
+        file_content = post_data['value']
+        self.post(requested_file, file_content)
 
-        #f.write("POST request for {}\n {}".format(self.path, post_data))
-        #self.wfile.write("POST request for {}\n {}".format(self.path, post_data.decode('utf-8')).encode('utf-8'))
-
-    # Update resource in database
     def do_PUT(self):
         # Gets the size of data
         content_length = int(self.headers['Content-Length'])
@@ -73,18 +104,9 @@ class Database(BaseHTTPRequestHandler):
         logging.info("PUT request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
                      str(self.path), str(self.headers), put_data)
 
-        #requestedFile = os.path.join(rootDir, post_data['key'])
         requested_file = put_data['key']
-        if exists(requested_file):
-            # Update file
-            file = open(requested_file, "w")
-            file.write(put_data['value'])
-            file.close()
-            self._set_response(200)
-        else:
-            self._set_response(404)
-
-    # Delete resource in database
+        file_content = put_data['value']
+        self.update(requested_file, file_content)
 
     def do_DELETE(self):
         logging.info("DELETE request,\nPath: %s\nHeaders:\n%s\n",
@@ -96,23 +118,8 @@ class Database(BaseHTTPRequestHandler):
 
         # Obtain path
         delete_data = query.split("=")
-        #requestedFile = os.path.join(rootDir, get_data['key'])
         requested_file = delete_data[1]
-
-        #self.wfile.write("GET request for {}".format(self.path).encode('utf-8'))
-
-        # Open and delete requested file if found, if not, send 404
-        if exists(requested_file):
-            os.remove(requested_file)
-            self._set_response(200)
-        else:
-            self._set_response(404)
-
-    def getIsReplica(self):
-        return isReplica
-
-    def sendRequestToReplica(self, key, text):
-        pass
+        self.delete(requested_file)
 
 
 def run(server_class=HTTPServer, handler_class=Database, port=8080):
