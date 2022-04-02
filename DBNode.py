@@ -5,17 +5,17 @@ from sys import argv
 import logging
 import json
 import os
+import requests
 
-from flask import request
 
 isReplica = False
-followersIp = []
+followers = []
 #rootDir = '/db'
 rootDir = '/home/mhl/Documents/2022-1/tele/distributed-database_tet_p1'
 
 
 class Database(BaseHTTPRequestHandler):
-    global isReplica, followersIp, rootDir
+    global isReplica, followers, rootDir
 
     # Send response to client
     def _set_response(self, code):
@@ -23,11 +23,13 @@ class Database(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
 
-    def sendRequestToReplica(self, key, text):
-        pass
+    def sendRequestToReplica(self, query):
+        for follower in followers:
+            r = requests.post(follower, json=query)
 
     # Return data from DB
-    def get(self, filename):
+    def get(self, post_data):
+        filename = post_data['key']
         #requestedFile = os.path.join(rootDir, file)
         # Open and send requested file if found, if not, send 404
         try:
@@ -35,12 +37,15 @@ class Database(BaseHTTPRequestHandler):
             content = file.read()
             file.close()
             self._set_response(200)
-            self.wfile.write(content.encode('utf-8'))
+            # self.wfile.write(content.encode('utf-8'))
+            self.wfile.write(content)
         except:
             self._set_response(404)
 
     # Update resource in database
-    def update(self, filename, file_content):
+    def update(self, post_data):
+        filename = post_data['key']
+        file_content = post_data['value']
         #requestedFile = os.path.join(rootDir, post_data['key'])
         if exists(filename):
             # Update file
@@ -51,11 +56,12 @@ class Database(BaseHTTPRequestHandler):
         else:
             self._set_response(404)
 
-        if not getIsReplica():
-            pass
+        if not isReplica():
+            self.sendRequestToReplica(post_data)
 
     # Delete resource in database
-    def delete(self, filename):
+    def delete(self, post_data):
+        filename = post_data['key']
         #requestedFile = os.path.join(rootDir, get_data['key'])
         # Open and delete requested file if found, if not, send 404
         if exists(filename):
@@ -64,27 +70,22 @@ class Database(BaseHTTPRequestHandler):
         else:
             self._set_response(404)
 
+        if not isReplica():
+            self.sendRequestToReplica(post_data)
+
     # Create resource in database
-    def post(self, file, file_content):
+    def put(self, post_data):
+        filename = post_data['key']
+        file_content = post_data['value']
         # Save file
         #requestedFile = os.path.join(rootDir, post_data['key'])
-        file = open(file, "w")
+        file = open(filename, "w")
         file.write(file_content)
         file.close()
         self._set_response(200)
 
-    def do_GET(self):
-        logging.info("GET request,\nPath: %s\nHeaders:\n%s\n",
-                     str(self.path), str(self.headers))
-
-        # Obtain json request from client
-        request_lenght = len(self.path)
-        query = self.path[2:request_lenght]
-
-        # Obtain path
-        get_data = query.split("=")
-        requested_file = get_data[1]
-        self.get(requested_file)
+        if not isReplica():
+            self.sendRequestToReplica(post_data)
 
     def do_POST(self):
         # Gets the size of data
@@ -93,33 +94,15 @@ class Database(BaseHTTPRequestHandler):
         logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
                      str(self.path), str(self.headers), post_data)
 
-        requested_file = post_data['key']
-        file_content = post_data['value']
-        self.post(requested_file, file_content)
-
-    def do_PUT(self):
-        # Gets the size of data
-        content_length = int(self.headers['Content-Length'])
-        put_data = json.loads(self.rfile.read(content_length))
-        logging.info("PUT request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
-                     str(self.path), str(self.headers), put_data)
-
-        requested_file = put_data['key']
-        file_content = put_data['value']
-        self.update(requested_file, file_content)
-
-    def do_DELETE(self):
-        logging.info("DELETE request,\nPath: %s\nHeaders:\n%s\n",
-                     str(self.path), str(self.headers))
-
-        # Obtain json request from client
-        request_lenght = len(self.path)
-        query = self.path[2:request_lenght]
-
-        # Obtain path
-        delete_data = query.split("=")
-        requested_file = delete_data[1]
-        self.delete(requested_file)
+        method = post_data['method']
+        if method == 'get':
+            self.get(post_data)
+        elif method == 'put':
+            self.put(post_data)
+        elif method == 'update':
+            self.put(post_data)
+        else:  # delete
+            self.delete(post_data)
 
 
 def run(server_class=HTTPServer, handler_class=Database, port=8080):
