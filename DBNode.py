@@ -37,7 +37,7 @@ class Database(BaseHTTPRequestHandler):
             content = file.read()
             file.close()
             self._set_response(200)
-            # self.wfile.write(content.encode('utf-8'))
+            #self.wfile.write(content.encode('utf-8'))
             self.wfile.write(content)
         except:
             self._set_response(404)
@@ -56,7 +56,7 @@ class Database(BaseHTTPRequestHandler):
         else:
             self._set_response(404)
 
-        if not isReplica():
+        if not isReplica:
             self.sendRequestToReplica(post_data)
 
     # Delete resource in database
@@ -70,7 +70,7 @@ class Database(BaseHTTPRequestHandler):
         else:
             self._set_response(404)
 
-        if not isReplica():
+        if not isReplica:
             self.sendRequestToReplica(post_data)
 
     # Create resource in database
@@ -84,7 +84,7 @@ class Database(BaseHTTPRequestHandler):
         file.close()
         self._set_response(200)
 
-        if not isReplica():
+        if not isReplica:
             self.sendRequestToReplica(post_data)
 
     def do_POST(self):
