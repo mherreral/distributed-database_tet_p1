@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import requests.exceptions
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -8,18 +7,20 @@ import json
 import base64
 from argparse import ArgumentParser
 
-
+url = ''
 def check_server():
-    url = 'http://ec2-18-233-171-48.compute-1.amazonaws.com'
+    global url
+    #url = 'http://ec2-18-233-171-48.compute-1.amazonaws.com'
+    url = 'http://localhost:8000'
 
     try:
         r = requests.get(url)
         r.raise_for_status()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         print("Down")
+        url = 'http://ec2-52-90-136-52.compute-1.amazonaws.com'
     except requests.exceptions.HTTPError:
         print("4xx, 5xx")
-    else:
         url = 'http://ec2-52-90-136-52.compute-1.amazonaws.com'
 
     return url
@@ -63,7 +64,7 @@ def json_to_output(json_data):
 def put(input_file):
     data = input_to_json(input_file)
     data['method'] = 'put'
-    response = requests.post(f'{url}/put', json=data)
+    response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Saved successfully')
@@ -73,10 +74,9 @@ def put(input_file):
 
 def get(key):
     data = {'key': key, 'method': 'get'}
-    response = requests.post(f'{url}/get', json=data)
+    response = requests.post(f'{url}', json=data)
     st_code = response.status_code
-    returned_data = json.loads(response.content)
-    print(returned_data)
+    returned_data = json.loads(response.text)
     if st_code == 200:
         json_to_output(returned_data)
         print('Successful request')
@@ -87,7 +87,7 @@ def get(key):
 def update(input_file):
     data = input_to_json(input_file)
     data['method'] = 'update'
-    response = requests.post(f'{url}/update', json=data)
+    response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Updated successfully')
@@ -96,8 +96,8 @@ def update(input_file):
 
 
 def delete(key):
-    data = {'key': key, 'operation': 'delete'}
-    response = requests.post(f'{url}/delete', json=data)
+    data = {'key': key, 'method': 'delete'}
+    response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Deleted successfully')
@@ -123,7 +123,7 @@ def arguments():
                        action='store_true')
 
     parser.add_argument('path', type=str,
-                        help='The name of the key or filename depending of the operation')
+                        help='The name of the key or filename depending of the method')
 
     args = parser.parse_args()
 
@@ -133,6 +133,7 @@ def arguments():
 if __name__ == '__main__':
     args = arguments()
     key = args.path
+    check_server()
     if args.update:
         update(key)
     elif args.delete:
