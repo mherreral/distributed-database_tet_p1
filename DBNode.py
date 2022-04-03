@@ -44,9 +44,9 @@ class Database(BaseHTTPRequestHandler):
             content = file.read()
             file.close()
             self._set_response(200)
-            # self.wfile.write(content.encode('utf-8'))
-            self.wfile.write(content)
-        except:
+            message = {'key': filename, 'value': content}
+            self.wfile.write(json.dumps(message).encode('utf-8'))
+        except Exception as e:
             self._set_response(404)
 
     # Update resource in database
