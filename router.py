@@ -12,6 +12,7 @@ class Router():
         self.DBSegments = []
         self.readDBSegments(DBSegmentsConfigFile)
         self.isReplica = isReplica
+        self.replica = "ec2-52-90-136-52.compute-1.amazonaws.com"
         if not isReplica:
             self.replica = replicaIP
         self.nextSegment = 0
@@ -43,8 +44,6 @@ class Router():
         
         
 
-router = Router()
-print ("ÁA")
 class RequestHandler(BaseHTTPRequestHandler):
 
     def acknowledge(self, code=200, contentType='application/json', message=""):
@@ -60,7 +59,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         while segmentIndex < len (router.DBSegments[segment]): # while DB replicas in this segment
             try:
                 print(f"Trying with Node {segmentIndex}")
-                r = requests.post(f'http://{DBSegmentLeader}:7777', json=postData, timeout=5)
+                r = requests.post(f'http://{DBSegmentLeader}:80', json=postData, timeout=5)
                 print(f"Success with Node {segmentIndex}")
                 break
             except requests.exceptions.Timeout:
@@ -86,6 +85,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         contentLength = int(self.headers['content-length'])
         postData = json.loads(self.rfile.read(contentLength))
+        if not self.isReplica:
+            try:
+                r = requests.post(f'http://{router.replica}:80', json=postData, timeout=5)
+            except requests.exceptions.Timeout:
+                print (f"Replica for router not responding.", end=" ")
         postData["source"] = "router"
         if postData['method'] == "write":
             segment = router.calculateNextSegment()
@@ -100,9 +104,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         if postData["method"] == "delete":
             router.deleteKeyToSegmentValueTable(postData["key"])
-        self.relayMessageToDBNode(segment, postData)
+        if not self.isReplica:
+            self.relayMessageToDBNode(segment, postData)
 
-def run(server_class=HTTPServer, handler_class=RequestHandler, port=7777):
+def run(server_class=HTTPServer, handler_class=RequestHandler, port=80):
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
     try:
@@ -112,9 +117,19 @@ def run(server_class=HTTPServer, handler_class=RequestHandler, port=7777):
     httpd.server_close()
 
 if __name__ == '__main__':
-    from sys import argv
+    import argparse
+    # Parameters management
+    parser = argparse.ArgumentParser(description="Router")
+    parser.add_argument("--port", type=int, metavar="PORT", default = 80, help="Port on which to run. Default is 80.")
+    parser.add_argument("--replica", type=str, default="false", help="If is replica - supports 'false' and 'true'. Default is false.")
 
-    if len(argv) == 2:
-        run(port=int(argv[1]))
+    args = parser.parse_args()
+    if args.replica.lower() == "false":
+        isReplica = False
     else:
-        run()
+        isReplica = True
+    port = int(args.port)
+    router = Router(isReplica=isReplica)
+
+
+    run(port=port)
