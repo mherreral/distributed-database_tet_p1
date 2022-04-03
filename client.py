@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import requests.exceptions
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import requests
@@ -8,7 +9,20 @@ import base64
 from argparse import ArgumentParser
 
 
-url = 'http://localhost:8000'
+def check_server():
+    url = 'http://ec2-18-233-171-48.compute-1.amazonaws.com'
+
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        print("Down")
+    except requests.exceptions.HTTPError:
+        print("4xx, 5xx")
+    else:
+        url = 'ec2-52-90-136-52.compute-1.amazonaws.com'
+
+    return url
 
 
 def dd(str):
