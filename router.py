@@ -47,29 +47,14 @@ router = Router()
 print ("ÁA")
 class RequestHandler(BaseHTTPRequestHandler):
 
-    def acknowledge(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
+    def acknowledge(self, code=200, contentType='application/json', message=""):
+        self.send_response(code)
+        self.send_header('Content-type', contentType)
+        self.wfile.write(f"{json.dumps(message)}")
         self.end_headers()
 
-    #def do_GET(self):
-    #    self.acknowledge()
-    #    self.wfile.write("GET request for {}".format(self.path).encode('utf-8'))
-
-    def do_POST(self):
+    def relayMessageToDBNode(self, segment, postData):
         global router
-        ctype, pdict = cgi.parse_header(self.headers['content-type'])
-        
-        # refuse to receive non-json content
-        if ctype != 'application/json':
-            self.send_response(400)
-            self.end_headers()
-            return
-
-        contentLength = int(self.headers['content-length'])
-        postData = json.loads(self.rfile.read(contentLength))
-
-        segment = router.calculateNextSegment()
         segmentIndex = 0 # 0 is segment leader
         DBSegmentLeader = router.DBSegments[segment][segmentIndex] # 0 position is leader
         while segmentIndex < len (router.DBSegments[segment]): # while DB replicas in this segment
@@ -82,15 +67,40 @@ class RequestHandler(BaseHTTPRequestHandler):
                 print (f"Node {segmentIndex} in segment {segment} not responding.", end=" ")
                 segmentIndex +=1 # use a replica
         if segmentIndex == len(router.DBSegments):
-            raise SystemExit("No DB node in segment {segment} is responding.")
-        router.addKeyToSegmentValueTable(postData['key'], segment)
-        import time
-        time.sleep(3)
-        print(router.segmentValueTable)
+            message["message"] = "No DB node in segment {segment} is responding."
+            self.acknowledge(code=400, message=json.dumps(message))
+            print("No DB node in segment {segment} is responding.")
+        else:
+            self.acknowledge(code=r.status_code, message=r.text)
+        
 
+    def do_POST(self):
+        global router
+        ctype, pdict = cgi.parse_header(self.headers['content-type'])
+        
+        # refuse to receive non-json content
+        if ctype != 'application/json':
+            message["message"] = "Not sent a json. Please send a json"
+            self.acknowledge(code=400, message=json.dumps(message))
+            return
 
-        self.acknowledge()
-        #self.wfile.write(f"AAA {post_data}")
+        contentLength = int(self.headers['content-length'])
+        postData = json.loads(self.rfile.read(contentLength))
+        postData["source"] = "router"
+        if postData['method'] == "write":
+            segment = router.calculateNextSegment()
+            router.addKeyToSegmentValueTable(postData['key'], segment)
+        else:
+            try:
+                segment = router.segmentValueTable[postData['key']]
+            except KeyError:
+                message = json.dumps({"message": "No value for key: {postData['key']}"})
+                self.acknowledge(code=404, message=message)
+                return
+
+        if postData["method"] == "delete":
+            router.deleteKeyToSegmentValueTable(postData["key"])
+        self.relayMessageToDBNode(segment, postData)
 
 def run(server_class=HTTPServer, handler_class=RequestHandler, port=7777):
     server_address = ('', port)
