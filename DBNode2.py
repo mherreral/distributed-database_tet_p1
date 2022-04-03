@@ -10,7 +10,7 @@ import socket
 
 
 isReplica = True
-dbnodes = []
+dbnodes = ['10.0.1.105', '10.0.1.24']
 rootDir = '/home/ec2-user/db'
 #rootDir = '/home/mhl/Documents/2022-1/tele/distributed-database_tet_p1'
 
