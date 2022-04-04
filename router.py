@@ -5,6 +5,7 @@ import cgi
 import pathlib
 import pickle
 import requests
+import logging
 
 
 class Router():
@@ -88,6 +89,15 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global router
+        logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+        logging.info(f"Started post")
+
         ctype, pdict = cgi.parse_header(self.headers['content-type'])
 
         # refuse to receive non-json content
@@ -95,6 +105,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             message["message"] = "Not sent a json. Please send a json"
             self.acknowledge(code=400, message=json.dumps(
                 message).encode('utf-8'))
+            logging.info(f"Err - Refused to recieve non-json content")
             return
         
         contentLength = int(self.headers['content-length'])
@@ -105,8 +116,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                     f'http://{router.replica}:80', json=postData, timeout=5)
             except requests.exceptions.Timeout:
                 print(f"Replica for router not responding.", end=" ")
+                logging.info(f"Replica for router not responding")
         else:
             message = "success".encode('utf-8')
+            logging.info(f"Succesful post")
             self.acknowledge(code=200, message=message)
         postData["source"] = "router"
         if postData['method'] == "put":
@@ -119,12 +132,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                 message = json.dumps(
                     {"message": "No value for key: {postData['key']}"}).encode('utf-8')
                 self.acknowledge(code=404, message=message)
+                logging.info(f"Err - No value for key")
                 return
 
         if postData["method"] == "delete":
             router.deleteKeyTosegmentKeyTable(postData["key"])
+            logging.info(f"Deleting")
         if not router.isReplica:
             self.relayMessageToDBNode(segment, postData)
+            logging.info(f"Router is not replica")
 
 
 def run(server_class=HTTPServer, handler_class=RequestHandler, port=80):
@@ -153,5 +169,14 @@ if __name__ == '__main__':
         isReplica = True
     port = int(args.port)
     router = Router(isReplica=isReplica)
+
+    logging.basicConfig(filename="router.log",
+        filemode="a",
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt='%m/%d/%Y %I:%M:%S %p'
+        )
+
+    logging.info(f"STARTED ROUTER USING PORT {port}")
 
     run(port=port)
