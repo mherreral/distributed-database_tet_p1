@@ -10,8 +10,9 @@ from argparse import ArgumentParser
 url = ''
 def check_server():
     global url
+    url = 'http://ec2-54-174-27-144.compute-1.amazonaws.com:80'
     #url = 'http://ec2-18-233-171-48.compute-1.amazonaws.com'
-    url = 'http://localhost:8000'
+    #url = 'http://localhost:8000'
 
     try:
         r = requests.get(url)

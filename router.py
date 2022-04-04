@@ -8,7 +8,7 @@ import requests
 
 
 class Router():
-    def __init__(self, DBSegmentsConfigFile="DBSegments", isReplica=False, replicaIP = None, segmentValueFile="segmentKeyTable.pickle"):
+    def __init__(self, DBSegmentsConfigFile="DBSegments", isReplica=False, replicaIP=None, segmentValueFile="segmentKeyTable.pickle"):
         self.DBSegments = []
         self.readDBSegments(DBSegmentsConfigFile)
         self.isReplica = isReplica
@@ -18,9 +18,11 @@ class Router():
         self.nextSegment = 0
         self.segmentValueFile = pathlib.Path(segmentValueFile)
         if self.segmentValueFile.exists():
-            self.segmentKeyTable = pickle.load(self.segmentValueFile.open("rb"))
+            self.segmentKeyTable = pickle.load(
+                self.segmentValueFile.open("rb"))
         else:
             self.segmentKeyTable = {}
+
     def readDBSegments(self, configFile="DBSegments"):
         self.configFileDBSegments = pathlib.Path(configFile)
         with self.configFileDBSegments.open() as f:
@@ -28,25 +30,27 @@ class Router():
                 leaderAndFollowers = line.strip().split()
                 self.DBSegments.append(leaderAndFollowers)
             if len(self.DBSegments) == 0:
-                raise SystemExit('ERROR: not enough Database segments. Check database nodes config file.')
+                raise SystemExit(
+                    'ERROR: not enough Database segments. Check database nodes config file.')
         print("Read DB segments")
+
     def calculateNextSegment(self):
         self.nextSegment = (self.nextSegment + 1) % len(self.DBSegments)
         return self.nextSegment
-        
-        return self.nextSegment
+
     def addKeyTosegmentKeyTable(self, key, segment):
         self.segmentKeyTable[key] = segment
-        pickle.dump( self.segmentKeyTable, self.segmentValueFile.open("wb") )
+        pickle.dump(self.segmentKeyTable, self.segmentValueFile.open("wb"))
+
     def deleteKeyTosegmentKeyTable(self, key):
         del self.segmentKeyTable[key]
-        pickle.dump( self.segmentKeyTable, self.segmentValueFile.open("wb") )
-        
-        
+        pickle.dump(self.segmentKeyTable, self.segmentValueFile.open("wb"))
+
 
 class RequestHandler(BaseHTTPRequestHandler):
 
-    def acknowledge(self, code=200, contentType='application/json', message=""): # message must be encoded already
+    # message must be encoded already
+    def acknowledge(self, code=200, contentType='application/json', message=""):
         self.send_response(code)
         self.send_header('Content-type', contentType)
         self.end_headers()
@@ -54,23 +58,28 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def relayMessageToDBNode(self, segment, postData):
         global router
-        segmentIndex = 0 # 0 is segment leader
-        DBSegmentLeader = router.DBSegments[segment][segmentIndex] # 0 position is leader
-        while segmentIndex < len (router.DBSegments[segment]): # while DB replicas in this segment
+        segmentIndex = 0  # 0 is segment leader
+        # 0 position is leader
+        DBSegmentLeader = router.DBSegments[segment][segmentIndex]
+        # while DB replicas in this segment
+        while segmentIndex < len(router.DBSegments[segment]):
             try:
                 print(f"Trying with Node {segmentIndex} {DBSegmentLeader}")
                 r = requests.post(f'http://{DBSegmentLeader}:80', json=postData, timeout=5)
                 print(f"Success with Node {segmentIndex}")
                 break
             except requests.exceptions.Timeout:
-                print (f"Node {segmentIndex} in segment {segment} not responding.", end=" ")
-                segmentIndex +=1 # use a replica
+                print(
+                    f"Node {segmentIndex} in segment {segment} not responding.", end=" ")
+                segmentIndex += 1  # use a replica
         if segmentIndex == len(router.DBSegments):
             message["message"] = "No DB node in segment {segment} is responding."
-            self.acknowledge(code=400, message=json.dumps(message).encode('utf-8'))
+            self.acknowledge(code=400, message=json.dumps(
+                message).encode('utf-8'))
             print("No DB node in segment {segment} is responding.")
         else:
-            self.acknowledge(code=r.status_code, message=r.text.encode('utf-8'))
+            self.acknowledge(code=r.status_code,
+                             message=r.text.encode('utf-8'))
 
     def do_GET(self):
         self.send_response(200)
@@ -80,20 +89,25 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         global router
         ctype, pdict = cgi.parse_header(self.headers['content-type'])
-        
+
         # refuse to receive non-json content
         if ctype != 'application/json':
             message["message"] = "Not sent a json. Please send a json"
-            self.acknowledge(code=400, message=json.dumps(message).encode('utf-8'))
+            self.acknowledge(code=400, message=json.dumps(
+                message).encode('utf-8'))
             return
         
         contentLength = int(self.headers['content-length'])
         postData = json.loads(self.rfile.read(contentLength))
         if not router.isReplica:
             try:
-                r = requests.post(f'http://{router.replica}:80', json=postData, timeout=5)
+                r = requests.post(
+                    f'http://{router.replica}:80', json=postData, timeout=5)
             except requests.exceptions.Timeout:
-                print (f"Replica for router not responding.", end=" ")
+                print(f"Replica for router not responding.", end=" ")
+        else:
+            message = "success".encode('utf-8')
+            self.acknowledge(code=200, message=message)
         postData["source"] = "router"
         if postData['method'] == "put":
             segment = router.calculateNextSegment()
@@ -102,7 +116,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             try:
                 segment = router.segmentKeyTable[postData['key']]
             except KeyError:
-                message = json.dumps({"message": "No value for key: {postData['key']}"}).encode('utf-8')
+                message = json.dumps(
+                    {"message": "No value for key: {postData['key']}"}).encode('utf-8')
                 self.acknowledge(code=404, message=message)
                 return
 
@@ -110,6 +125,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             router.deleteKeyTosegmentKeyTable(postData["key"])
         if not router.isReplica:
             self.relayMessageToDBNode(segment, postData)
+
 
 def run(server_class=HTTPServer, handler_class=RequestHandler, port=80):
     server_address = ('', port)
@@ -120,12 +136,15 @@ def run(server_class=HTTPServer, handler_class=RequestHandler, port=80):
         pass
     httpd.server_close()
 
+
 if __name__ == '__main__':
     import argparse
     # Parameters management
     parser = argparse.ArgumentParser(description="Router")
-    parser.add_argument("--port", type=int, metavar="PORT", default = 80, help="Port on which to run. Default is 80.")
-    parser.add_argument("--replica", type=str, default="false", help="If is replica - supports 'false' and 'true'. Default is false.")
+    parser.add_argument("--port", type=int, metavar="PORT",
+                        default=80, help="Port on which to run. Default is 80.")
+    parser.add_argument("--replica", type=str, default="false",
+                        help="If is replica - supports 'false' and 'true'. Default is false.")
 
     args = parser.parse_args()
     if args.replica.lower() == "false":
@@ -134,6 +153,5 @@ if __name__ == '__main__':
         isReplica = True
     port = int(args.port)
     router = Router(isReplica=isReplica)
-
 
     run(port=port)
