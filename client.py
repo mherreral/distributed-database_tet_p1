@@ -118,6 +118,7 @@ def put(input_file):
 
     data = input_to_json(input_file)
     data['method'] = 'put'
+    data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
@@ -135,14 +136,16 @@ def get(key):
             )
 
     logging.info(f'Beginning get operation')
-
-    data = {'key': key, 'method': 'get'}
+    data = {'key': key, 'method': 'get', 'source': 'client'}
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
-    returned_data = json.loads(response.text)
+    #print(f"****{response.text}************")
     if st_code == 200:
+        returned_data = json.loads(response.text)
         json_to_output(returned_data)
         print('Successful request')
+    elif st_code == 404:
+        print(f'Key {key} does not exists')
     else:
         print('Something went wrong')
 
@@ -159,10 +162,13 @@ def update(input_file):
 
     data = input_to_json(input_file)
     data['method'] = 'update'
+    data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Updated successfully')
+    elif st_code == 404:
+        print(f'Key {key} does not exists')
     else:
         print('Something went wrong')
 
@@ -178,10 +184,13 @@ def delete(key):
     logging.info(f'Beginning delete operation')
 
     data = {'key': key, 'method': 'delete'}
+    data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Deleted successfully')
+    elif st_code == 404:
+        print(f'Key {key} does not exists')
     else:
         print('Something went wrong')
 
