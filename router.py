@@ -5,6 +5,7 @@ import cgi
 import pathlib
 import pickle
 import requests
+import logging
 
 
 class Router():
@@ -12,8 +13,8 @@ class Router():
         self.DBSegments = []
         self.readDBSegments(DBSegmentsConfigFile)
         self.isReplica = isReplica
-        self.replica = "ec2-52-90-136-52.compute-1.amazonaws.com"
-        # if not isReplica:
+        self.replica = '10.0.0.241' 
+        #if not isReplica:
         #    self.replica = replicaIP
         self.nextSegment = 0
         self.segmentValueFile = pathlib.Path(segmentValueFile)
@@ -64,9 +65,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         # while DB replicas in this segment
         while segmentIndex < len(router.DBSegments[segment]):
             try:
-                print(f"Trying with Node {segmentIndex}")
-                r = requests.post(
-                    f'http://{DBSegmentLeader}:80', json=postData, timeout=5)
+                print(f"Trying with Node {segmentIndex} {DBSegmentLeader}")
+                r = requests.post(f'http://{DBSegmentLeader}:80', json=postData, timeout=5)
                 print(f"Success with Node {segmentIndex}")
                 break
             except requests.exceptions.Timeout:
@@ -89,6 +89,15 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global router
+        logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+        logging.info(f"Started post")
+
         ctype, pdict = cgi.parse_header(self.headers['content-type'])
 
         # refuse to receive non-json content
@@ -96,19 +105,23 @@ class RequestHandler(BaseHTTPRequestHandler):
             message["message"] = "Not sent a json. Please send a json"
             self.acknowledge(code=400, message=json.dumps(
                 message).encode('utf-8'))
+            logging.info(f"Err - Refused to recieve non-json content")
             return
-
+        
         contentLength = int(self.headers['content-length'])
         postData = json.loads(self.rfile.read(contentLength))
+        if postData['source'] == 'client':
+            fromClient = True
+        else:
+            fromClient = False
         if not router.isReplica:
+            postData['source'] = 'router'
             try:
                 r = requests.post(
                     f'http://{router.replica}:80', json=postData, timeout=5)
             except requests.exceptions.Timeout:
                 print(f"Replica for router not responding.", end=" ")
-        else:
-            message = "success".encode('utf-8')
-            self.acknowledge(code=200, message=message)
+                logging.info(f"Replica for router not responding")
         postData["source"] = "router"
         if postData['method'] == "put":
             segment = router.calculateNextSegment()
@@ -117,15 +130,17 @@ class RequestHandler(BaseHTTPRequestHandler):
             try:
                 segment = router.segmentKeyTable[postData['key']]
             except KeyError:
-                message = json.dumps(
-                    {"message": "No value for key: {postData['key']}"}).encode('utf-8')
+                message = "".encode('utf-8')
                 self.acknowledge(code=404, message=message)
+                logging.info(f"Err - No value for key")
                 return
 
         if postData["method"] == "delete":
             router.deleteKeyTosegmentKeyTable(postData["key"])
-        if not router.isReplica:
+            logging.info(f"Deleting")
+        if fromClient:
             self.relayMessageToDBNode(segment, postData)
+            logging.info(f"Router is not replica")
 
 
 def run(server_class=HTTPServer, handler_class=RequestHandler, port=80):
@@ -154,5 +169,14 @@ if __name__ == '__main__':
         isReplica = True
     port = int(args.port)
     router = Router(isReplica=isReplica)
+
+    logging.basicConfig(filename="router.log",
+        filemode="a",
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt='%m/%d/%Y %I:%M:%S %p'
+        )
+
+    logging.info(f"STARTED ROUTER USING PORT {port}")
 
     run(port=port)

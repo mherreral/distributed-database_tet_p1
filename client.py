@@ -10,6 +10,15 @@ from argparse import ArgumentParser
 url = ''
 def check_server():
     global url
+    logging.basicConfig(filename="Client.log",
+        filemode="a",
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt='%m/%d/%Y %I:%M:%S %p'
+        )
+
+    logging.info(f'Checking connection to router')
+
     url = 'http://ec2-3-80-156-192.compute-1.amazonaws.com:80'
     #url = 'http://ec2-18-233-171-48.compute-1.amazonaws.com'
     #url = 'http://localhost:8000'
@@ -33,14 +42,40 @@ def dd(str):
 
 
 def encode_b64(data):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Encoding b64')
+
     return base64.b64encode(data).decode('utf-8')
 
 
 def decode_b64(data):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+    logging.info(f'Decoding b64')
+
     return base64.b64decode(data.encode('utf-8'))
 
 
 def input_to_json(input_file):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Creting input JSON')
+
     f = open(input_file, "rb")
     input_content = f.read()
     input_name = f.name
@@ -52,6 +87,15 @@ def input_to_json(input_file):
 
 
 def json_to_output(json_data):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Creating output JSON')
+
 
     output_name = json_data['key']
     encoded_content = json_data['value']
@@ -63,6 +107,15 @@ def json_to_output(json_data):
 
 
 def put(input_file):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Beginning put operation')
+
     data = input_to_json(input_file)
     data['method'] = 'put'
     data['source'] = 'client'
@@ -75,6 +128,14 @@ def put(input_file):
 
 
 def get(key):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Beginning get operation')
     data = {'key': key, 'method': 'get', 'source': 'client'}
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
@@ -90,6 +151,15 @@ def get(key):
 
 
 def update(input_file):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Beginning update operation')
+
     data = input_to_json(input_file)
     data['method'] = 'update'
     data['source'] = 'client'
@@ -104,6 +174,15 @@ def update(input_file):
 
 
 def delete(key):
+    logging.basicConfig(filename="Client.log",
+            filemode="a",
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt='%m/%d/%Y %I:%M:%S %p'
+            )
+
+    logging.info(f'Beginning delete operation')
+
     data = {'key': key, 'method': 'delete'}
     data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
@@ -142,6 +221,15 @@ def arguments():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(filename="Client.log",
+        filemode="a",
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt='%m/%d/%Y %I:%M:%S %p'
+        )
+
+    logging.info(f"STARTED CLIENT")
+
     args = arguments()
     key = args.path
     check_server()
