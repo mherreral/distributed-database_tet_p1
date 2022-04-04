@@ -12,9 +12,9 @@ class Router():
         self.DBSegments = []
         self.readDBSegments(DBSegmentsConfigFile)
         self.isReplica = isReplica
-        self.replica = "ec2-52-90-136-52.compute-1.amazonaws.com"
-        if not isReplica:
-            self.replica = replicaIP
+        self.replica = '10.0.0.241' 
+        #if not isReplica:
+        #    self.replica = replicaIP
         self.nextSegment = 0
         self.segmentValueFile = pathlib.Path(segmentValueFile)
         if self.segmentValueFile.exists():
@@ -58,8 +58,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         DBSegmentLeader = router.DBSegments[segment][segmentIndex] # 0 position is leader
         while segmentIndex < len (router.DBSegments[segment]): # while DB replicas in this segment
             try:
-                print(f"Trying with Node {segmentIndex}")
-                r = requests.post(f'http://{DBSegmentLeader}:7777', json=postData, timeout=5)
+                print(f"Trying with Node {segmentIndex} {DBSegmentLeader}")
+                r = requests.post(f'http://{DBSegmentLeader}:80', json=postData, timeout=5)
                 print(f"Success with Node {segmentIndex}")
                 break
             except requests.exceptions.Timeout:
@@ -86,7 +86,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             message["message"] = "Not sent a json. Please send a json"
             self.acknowledge(code=400, message=json.dumps(message).encode('utf-8'))
             return
-
+        
         contentLength = int(self.headers['content-length'])
         postData = json.loads(self.rfile.read(contentLength))
         if not router.isReplica:
