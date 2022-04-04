@@ -10,7 +10,7 @@ from argparse import ArgumentParser
 url = ''
 def check_server():
     global url
-    url = 'http://ec2-54-174-27-144.compute-1.amazonaws.com:80'
+    url = 'http://ec2-3-80-156-192.compute-1.amazonaws.com:80'
     #url = 'http://ec2-18-233-171-48.compute-1.amazonaws.com'
     #url = 'http://localhost:8000'
 
@@ -19,10 +19,10 @@ def check_server():
         r.raise_for_status()
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         print("Down")
-        url = 'http://ec2-52-90-136-52.compute-1.amazonaws.com'
+        url = 'http://ec2-54-173-40-29.compute-1.amazonaws.com:80'
     except requests.exceptions.HTTPError:
         print("4xx, 5xx")
-        url = 'http://ec2-52-90-136-52.compute-1.amazonaws.com'
+        url = 'http://ec2-54-173-40-29.compute-1.amazonaws.com:80'
 
     return url
 
@@ -65,6 +65,7 @@ def json_to_output(json_data):
 def put(input_file):
     data = input_to_json(input_file)
     data['method'] = 'put'
+    data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
@@ -74,13 +75,16 @@ def put(input_file):
 
 
 def get(key):
-    data = {'key': key, 'method': 'get'}
+    data = {'key': key, 'method': 'get', 'source': 'client'}
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
-    returned_data = json.loads(response.text)
+    #print(f"****{response.text}************")
     if st_code == 200:
+        returned_data = json.loads(response.text)
         json_to_output(returned_data)
         print('Successful request')
+    elif st_code == 404:
+        print(f'Key {key} does not exists')
     else:
         print('Something went wrong')
 
@@ -88,20 +92,26 @@ def get(key):
 def update(input_file):
     data = input_to_json(input_file)
     data['method'] = 'update'
+    data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Updated successfully')
+    elif st_code == 404:
+        print(f'Key {key} does not exists')
     else:
         print('Something went wrong')
 
 
 def delete(key):
     data = {'key': key, 'method': 'delete'}
+    data['source'] = 'client'
     response = requests.post(f'{url}', json=data)
     st_code = response.status_code
     if st_code == 200:
         print('Deleted successfully')
+    elif st_code == 404:
+        print(f'Key {key} does not exists')
     else:
         print('Something went wrong')
 
