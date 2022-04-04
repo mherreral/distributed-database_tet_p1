@@ -110,17 +110,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         
         contentLength = int(self.headers['content-length'])
         postData = json.loads(self.rfile.read(contentLength))
+        if postData['source'] == 'client':
+            fromClient = True
+        else:
+            fromClient = False
         if not router.isReplica:
+            postData['source'] = 'router'
             try:
                 r = requests.post(
                     f'http://{router.replica}:80', json=postData, timeout=5)
             except requests.exceptions.Timeout:
                 print(f"Replica for router not responding.", end=" ")
                 logging.info(f"Replica for router not responding")
-        else:
-            message = "success".encode('utf-8')
-            logging.info(f"Succesful post")
-            self.acknowledge(code=200, message=message)
         postData["source"] = "router"
         if postData['method'] == "put":
             segment = router.calculateNextSegment()
@@ -129,8 +130,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             try:
                 segment = router.segmentKeyTable[postData['key']]
             except KeyError:
-                message = json.dumps(
-                    {"message": "No value for key: {postData['key']}"}).encode('utf-8')
+                message = "".encode('utf-8')
                 self.acknowledge(code=404, message=message)
                 logging.info(f"Err - No value for key")
                 return
@@ -138,7 +138,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if postData["method"] == "delete":
             router.deleteKeyTosegmentKeyTable(postData["key"])
             logging.info(f"Deleting")
-        if not router.isReplica:
+        if fromClient:
             self.relayMessageToDBNode(segment, postData)
             logging.info(f"Router is not replica")
 
